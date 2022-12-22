@@ -1,0 +1,21 @@
+From: Michael Fladischer <fladi@debian.org>
+Date: Wed, 27 Oct 2021 20:19:53 +0000
+Subject: Install unittests.
+
+---
+ setup.cfg | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/setup.cfg b/setup.cfg
+index 0691809..7481e16 100644
+--- a/setup.cfg
++++ b/setup.cfg
+@@ -25,7 +25,7 @@ keyword =
+ 
+ [options]
+ python_requires=>=3.6
+-packages = mock
++packages = mock, mock.tests
+ 
+ [options.extras_require]
+ docs =

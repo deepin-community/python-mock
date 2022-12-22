@@ -1,0 +1,24 @@
+From: Debian Python Team <team+python@tracker.debian.org>
+Date: Wed, 27 Oct 2021 20:19:15 +0000
+Subject: Fix privacy breach in docs
+
+Forwarded: not-needed
+---
+ README.rst | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/README.rst b/README.rst
+index 279f2dc..432b9c7 100644
+--- a/README.rst
++++ b/README.rst
+@@ -24,10 +24,8 @@ Please see the standard library documentation for more details.
+ :Build status:
+     |CircleCI|_ |Docs|_
+ 
+-    .. |CircleCI| image:: https://circleci.com/gh/testing-cabal/mock/tree/master.svg?style=shield
+     .. _CircleCI: https://circleci.com/gh/testing-cabal/mock/tree/master
+ 
+-    .. |Docs| image:: https://readthedocs.org/projects/mock/badge/?version=latest
+     .. _Docs: http://mock.readthedocs.org/en/latest/
+ 
+ .. _Mock Homepage: http://mock.readthedocs.org/en/latest/

@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+export PYBUILD_NAME=mock
+export PYBUILD_TEST_ARGS=--pyargs mock.tests
+
+%:
+	dh $@ --with python3,sphinxdoc --buildsystem=pybuild
+
+override_dh_sphinxdoc:
+ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
+	PYTHONPATH=. python3 -m sphinx -b html -N docs/ debian/python-mock-doc/usr/share/doc/python-mock-doc/html
+	dh_sphinxdoc
+endif
+
+override_dh_compress:
+	dh_compress -X.js -X.html -X.txt
