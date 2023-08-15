@@ -1,3 +1,4 @@
 0001-Disable-failing-test.patch
 0002-Privacy-breach-in-docs.patch
 0003-Install-unittests.patch
+0004-fix-tests-that-should-test-mock-but-were-testing-uni.patch
