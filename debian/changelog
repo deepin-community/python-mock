@@ -1,3 +1,22 @@
+python-mock (4.0.3-4) unstable; urgency=medium
+
+  [ Debian Janitor ]
+  * Remove constraints unnecessary since buster (oldstable):
+    + Build-Depends: Drop versioned constraint on python3-pbr and
+      python3-setuptools.
+    + python3-mock: Drop versioned constraint on python3-pbr in Depends.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 17 Oct 2022 00:14:46 +0100
+
+python-mock (4.0.3-3) unstable; urgency=medium
+
+  * Depend on python3-all for autopkgtests.
+  * Add upstream patch to fix tests that should test mock but were
+    testing unittest.mock (Closes: #1001422, #1002345).
+  * Update year in d/copyright.
+
+ -- Michael Fladischer <fladi@debian.org>  Thu, 13 Jan 2022 15:21:45 +0000
+
 python-mock (4.0.3-2) unstable; urgency=low
 
   [ Debian Janitor ]
