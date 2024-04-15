@@ -29,7 +29,10 @@ def find_initial_cpython_rev():
 
 def cpython_revs_affecting_mock(cpython_repo, start):
     revs = git(f'log --no-merges --format=%H {start}..  '
-               f'-- Lib/unittest/mock.py Lib/unittest/test/testmock/',
+               f'-- '
+               f'Lib/unittest/mock.py '
+               f'Lib/unittest/test/testmock/ '
+               f'Lib/test/test_unittest/testmock/',
                repo=cpython_repo).split()
     revs.reverse()
     print(f'{len(revs)} patches that may need backporting')
@@ -58,6 +61,7 @@ def munge(rev, patch):
     for pattern, sub in (
         ('(a|b)/Lib/unittest/mock.py', r'\1/mock/mock.py'),
         (r'(a|b)/Lib/unittest/test/testmock/(\S+)', r'\1/mock/tests/\2'),
+        (r'(a|b)/Lib/test/test_unittest/testmock/(\S+)', r'\1/mock/tests/\2'),
         ('(a|b)/Misc/NEWS', r'\1/NEWS'),
         ('(a|b)/NEWS.d/next/[^/]+/(.+\.rst)', r'\1/NEWS.d/\2'),
     ):
@@ -111,14 +115,25 @@ def main():
     if args.skip_current:
         return skip_current(args.mock, args.skip_reason)
 
+    initial_cpython_rev = find_initial_cpython_rev()
+
+    if args.list:
+        for rev in cpython_revs_affecting_mock(args.cpython, initial_cpython_rev):
+            print(git(f'show --name-only --oneline {rev}', args.cpython), end='')
+            has_been_backported(args.mock, rev)
+            print()
+        return
+
     if repo_state_bad(args.mock):
         return
 
     cleanup_old_patches(args.mock)
 
-    initial_cpython_rev = find_initial_cpython_rev()
+    if args.rev:
+        revs = [args.rev]
+    else:
+        revs = cpython_revs_affecting_mock(args.cpython, initial_cpython_rev)
 
-    revs = cpython_revs_affecting_mock(args.cpython, initial_cpython_rev)
     for rev in revs:
 
         if has_been_backported(args.mock, rev):
@@ -131,13 +146,16 @@ def main():
         break
 
     else:
-        commit_last_sync(revs, args.mock)
+        if not args.rev:
+            commit_last_sync(revs, args.mock)
 
 
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument('--cpython', default='../cpython')
     parser.add_argument('--mock', default=abspath(dirname(__file__)))
+    parser.add_argument('--list', action='store_true', help='list revs remaining to backport')
+    parser.add_argument('--rev', help='backport a specific git hash')
     parser.add_argument('--skip-current', action='store_true')
     parser.add_argument('--skip-reason', default='it has no changes needed here.')
     return parser.parse_args()

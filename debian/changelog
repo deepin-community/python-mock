@@ -1,3 +1,13 @@
+python-mock (5.1.0-1) unstable; urgency=medium
+
+  * Team Upload
+  * New upstream version 5.1.0 (Closes: #717192, #717193, #1030887)
+    (LP: #1248066)
+  * remove obsolete build-dep python3-pbr & python3-unittest2
+  * use new dh-sequence-python3
+
+ -- Alexandre Detiste <tchet@debian.org>  Sun, 07 Jan 2024 19:07:23 +0100
+
 python-mock (4.0.3-4) unstable; urgency=medium
 
   [ Debian Janitor ]
