@@ -12,7 +12,8 @@ from mock import (
     NonCallableMagicMock, AsyncMock,
     create_autospec, mock
 )
-from mock.mock import _Call, _CallList
+from mock.mock import _Call, _CallList, InvalidSpecError
+import mock.mock as mock_module
 
 
 class Iter(object):
@@ -38,6 +39,23 @@ class Something(object):
     def smeth(a, b, c, d=None): pass
 
 
+class SomethingElse(object):
+    def __init__(self):
+        self._instance = None
+
+    @property
+    def instance(self):
+        if not self._instance:
+            self._instance = 'object'
+        return self._instance
+
+
+class Typos():
+    autospect = None
+    auto_spec = None
+    set_spec = None
+
+
 def something(a): pass
 
 
@@ -47,7 +65,7 @@ class MockTest(unittest.TestCase):
         # if __all__ is badly defined then import * will raise an error
         # We have to exec it because you can't import * inside a method
         # in Python 3
-        exec("from unittest.mock import *")
+        exec("from mock.mock import *")
 
 
     def test_constructor(self):
@@ -198,6 +216,44 @@ class MockTest(unittest.TestCase):
         mock.side_effect = ValueError('Bazinga!')
         self.assertRaisesRegex(ValueError, 'Bazinga!', mock)
 
+
+    def test_autospec_mock(self):
+        class A(object):
+            class B(object):
+                C = None
+
+        with mock.patch.object(A, 'B'):
+            with self.assertRaisesRegex(InvalidSpecError,
+                                        "Cannot autospec attr 'B' from target <MagicMock spec='A'"):
+                create_autospec(A).B
+            with self.assertRaisesRegex(InvalidSpecError,
+                                        "Cannot autospec attr 'B' from target 'A'"):
+                mock.patch.object(A, 'B', autospec=True).start()
+            with self.assertRaisesRegex(InvalidSpecError,
+                                        "Cannot autospec attr 'C' as the patch target "):
+                mock.patch.object(A.B, 'C', autospec=True).start()
+            with self.assertRaisesRegex(InvalidSpecError,
+                                        "Cannot spec attr 'B' as the spec "):
+                mock.patch.object(A, 'B', spec=A.B).start()
+            with self.assertRaisesRegex(InvalidSpecError,
+                                        "Cannot spec attr 'B' as the spec_set "):
+                mock.patch.object(A, 'B', spec_set=A.B).start()
+            with self.assertRaisesRegex(InvalidSpecError,
+                                        "Cannot spec attr 'B' as the spec_set "):
+                mock.patch.object(A, 'B', spec_set=A.B).start()
+            with self.assertRaisesRegex(InvalidSpecError, "Cannot spec a Mock object."):
+                mock.Mock(A.B)
+            with mock.patch('builtins.open', mock.mock_open()):
+                mock.mock_open()  # should still be valid with open() mocked
+
+    def test_explicit_parent(self):
+        parent = Mock()
+        mock1 = Mock(parent=parent, return_value=None)
+        mock1(1, 2, 3)
+        mock2 = Mock(parent=parent, return_value=None)
+        mock2(4, 5, 6)
+
+        self.assertEqual(parent.mock_calls, [call(1, 2, 3), call(4, 5, 6)])
 
     def test_reset_mock(self):
         parent = Mock()
@@ -1600,7 +1656,7 @@ class MockTest(unittest.TestCase):
     #Issue21238
     def test_mock_unsafe(self):
         m = Mock()
-        msg = "Attributes cannot start with 'assert' or its misspellings"
+        msg = "is not a valid assertion. Use a spec for the mock"
         with self.assertRaisesRegex(AttributeError, msg):
             m.assert_foo_call()
         with self.assertRaisesRegex(AttributeError, msg):
@@ -1611,12 +1667,48 @@ class MockTest(unittest.TestCase):
             m.aseert_foo_call()
         with self.assertRaisesRegex(AttributeError, msg):
             m.assrt_foo_call()
+        with self.assertRaisesRegex(AttributeError, msg):
+            m.called_once_with()
+        with self.assertRaisesRegex(AttributeError, msg):
+            m.called_once()
+        with self.assertRaisesRegex(AttributeError, msg):
+            m.has_calls()
+
+        class Foo(object):
+            def called_once(self): pass
+
+            def has_calls(self): pass
+
+        m = Mock(spec=Foo)
+        m.called_once()
+        m.has_calls()
+
+        m.called_once.assert_called_once()
+        m.has_calls.assert_called_once()
+
         m = Mock(unsafe=True)
         m.assert_foo_call()
         m.assret_foo_call()
         m.asert_foo_call()
         m.aseert_foo_call()
         m.assrt_foo_call()
+        m.called_once()
+        m.called_once_with()
+        m.has_calls()
+
+    # gh-100739
+    def test_mock_safe_with_spec(self):
+        class Foo(object):
+            def assert_bar(self): pass
+
+            def assertSome(self): pass
+
+        m = Mock(spec=Foo)
+        m.assert_bar()
+        m.assertSome()
+
+        m.assert_bar.assert_called_once()
+        m.assertSome.assert_called_once()
 
     #Issue21262
     def test_assert_not_called(self):
@@ -2137,16 +2229,16 @@ class MockTest(unittest.TestCase):
         # test_patch_dict_test_prefix and test_patch_test_prefix not restoring
         # causes the objects patched to go out of sync
 
-        old_patch = unittest.mock.patch
+        old_patch = mock_module.patch
 
         # Directly using __setattr__ on unittest.mock causes current imported
         # reference to be updated. Use a lambda so that during cleanup the
         # re-imported new reference is updated.
-        self.addCleanup(lambda patch: setattr(unittest.mock, 'patch', patch),
+        self.addCleanup(lambda patch: setattr(mock_module, 'patch', patch),
                         old_patch)
 
         with patch.dict('sys.modules'):
-            del sys.modules['unittest.mock']
+            del sys.modules['mock']
 
             # This trace will stop coverage being measured ;-)
             def trace(frame, event, arg):  # pragma: no cover
@@ -2155,7 +2247,7 @@ class MockTest(unittest.TestCase):
             self.addCleanup(sys.settrace, sys.gettrace())
             sys.settrace(trace)
 
-            from unittest.mock import (
+            from mock.mock import (
                 Mock, MagicMock, NonCallableMock, NonCallableMagicMock
             )
 
@@ -2170,13 +2262,83 @@ class MockTest(unittest.TestCase):
     def test_bool_not_called_when_passing_spec_arg(self):
         class Something:
             def __init__(self):
-                self.obj_with_bool_func = unittest.mock.MagicMock()
+                self.obj_with_bool_func = mock_module.MagicMock()
 
         obj = Something()
-        with unittest.mock.patch.object(obj, 'obj_with_bool_func', autospec=True): pass
+        with mock_module.patch.object(obj, 'obj_with_bool_func', spec=object): pass
 
         self.assertEqual(obj.obj_with_bool_func.__bool__.call_count, 0)
 
+    def test_misspelled_arguments(self):
+        class Foo():
+            one = 'one'
+        # patch, patch.object and create_autospec need to check for misspelled
+        # arguments explicitly and throw a RuntimError if found.
+        with self.assertRaises(RuntimeError):
+            with patch(f'{__name__}.Something.meth', autospect=True): pass
+        with self.assertRaises(RuntimeError):
+            with patch.object(Foo, 'one', autospect=True): pass
+        with self.assertRaises(RuntimeError):
+            with patch(f'{__name__}.Something.meth', auto_spec=True): pass
+        with self.assertRaises(RuntimeError):
+            with patch.object(Foo, 'one', auto_spec=True): pass
+        with self.assertRaises(RuntimeError):
+            with patch(f'{__name__}.Something.meth', set_spec=True): pass
+        with self.assertRaises(RuntimeError):
+            with patch.object(Foo, 'one', set_spec=True): pass
+        with self.assertRaises(RuntimeError):
+            m = create_autospec(Foo, set_spec=True)
+        # patch.multiple, on the other hand, should flag misspelled arguments
+        # through an AttributeError, when trying to find the keys from kwargs
+        # as attributes on the target.
+        with self.assertRaises(AttributeError):
+            with patch.multiple(
+                f'{__name__}.Something', meth=DEFAULT, autospect=True): pass
+        with self.assertRaises(AttributeError):
+            with patch.multiple(
+                f'{__name__}.Something', meth=DEFAULT, auto_spec=True): pass
+        with self.assertRaises(AttributeError):
+            with patch.multiple(
+                f'{__name__}.Something', meth=DEFAULT, set_spec=True): pass
+
+        with patch(f'{__name__}.Something.meth', unsafe=True, autospect=True):
+            pass
+        with patch.object(Foo, 'one', unsafe=True, autospect=True): pass
+        with patch(f'{__name__}.Something.meth', unsafe=True, auto_spec=True):
+            pass
+        with patch.object(Foo, 'one', unsafe=True, auto_spec=True): pass
+        with patch(f'{__name__}.Something.meth', unsafe=True, set_spec=True):
+            pass
+        with patch.object(Foo, 'one', unsafe=True, set_spec=True): pass
+        m = create_autospec(Foo, set_spec=True, unsafe=True)
+        with patch.multiple(
+            f'{__name__}.Typos', autospect=True, set_spec=True, auto_spec=True):
+            pass
+
+    def test_property_not_called_with_spec_mock(self):
+        obj = SomethingElse()
+        self.assertIsNone(obj._instance, msg='before mock')
+        mock = Mock(spec=obj)
+        self.assertIsNone(obj._instance, msg='after mock')
+        self.assertEqual('object', obj.instance)
+
+    def test_decorated_async_methods_with_spec_mock(self):
+        class Foo():
+            @classmethod
+            async def class_method(cls):
+                pass  # pragma: no cover
+            @staticmethod
+            async def static_method():
+                pass  # pragma: no cover
+            async def method(self):
+                pass  # pragma: no cover
+        mock = Mock(spec=Foo)
+        for m in (mock.method, mock.class_method, mock.static_method):
+            if sys.version_info[:2] <= (3, 9) and m is not mock.method:
+                # class and static methods need bugfixes in cpython to work:
+                self.assertIsInstance(m, Mock)
+                continue
+            self.assertIsInstance(m, AsyncMock)
 
 if __name__ == '__main__':
     unittest.main()
